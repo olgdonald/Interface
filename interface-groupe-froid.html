@@ -1,0 +1,764 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#070d1f">
+<title>ThermoLoop · Pilotage groupe froid</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#070d1f;
+  --bg2:#0a1330;
+  --panel:#0d1832;
+  --panel2:#13224a;
+  --line:#22346a;
+  --line2:#2d4285;
+  --ink:#e9eefb;
+  --mute:#8d9bc2;
+  --dim:#5a6a98;
+  --ice:#6fd3ff;
+  --brass:#f2b45a;
+  --copper:#ff8a4c;
+  --ok:#5fe3a1;
+  --warn:#ffcf5c;
+  --crit:#ff6b5e;
+  --r:14px;
+  --nav:68px;
+  --f-head:'Barlow Condensed','Arial Narrow',sans-serif;
+  --f-body:'Barlow',system-ui,sans-serif;
+  --f-mono:'JetBrains Mono',ui-monospace,monospace;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html{background:var(--bg)}
+body{
+  margin:0;color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.4;
+  background:
+    radial-gradient(120% 60% at 50% -10%,#14275c 0%,transparent 60%),
+    linear-gradient(rgba(111,140,255,.045) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(111,140,255,.045) 1px,transparent 1px),
+    var(--bg);
+  background-size:auto,26px 26px,26px 26px,auto;
+  min-height:100vh;
+  padding-bottom:calc(var(--nav) + 24px + env(safe-area-inset-bottom));
+}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+.wrap{max-width:560px;margin:0 auto;padding:0 16px}
+
+/* ───────── En-tête ───────── */
+.top{position:sticky;top:0;z-index:20;background:linear-gradient(180deg,var(--bg) 70%,rgba(7,13,31,0));padding:calc(12px + env(safe-area-inset-top)) 0 14px}
+.top .row{display:flex;align-items:center;gap:12px}
+.brand{display:flex;align-items:center;gap:10px;flex:1;min-width:0}
+.mark{width:34px;height:34px;flex:none}
+.brand h1{margin:0;font-family:var(--f-head);font-weight:700;font-size:23px;letter-spacing:.06em;text-transform:uppercase;line-height:1}
+.brand small{display:block;font-family:var(--f-mono);font-size:9.5px;letter-spacing:.16em;color:var(--mute);text-transform:uppercase;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.estop{
+  flex:none;width:46px;height:46px;border-radius:50%;
+  border:2px solid var(--crit);color:var(--crit);
+  display:grid;place-items:center;background:rgba(255,107,94,.08);
+  box-shadow:0 0 0 4px rgba(255,107,94,.08);
+}
+.estop svg{width:20px;height:20px}
+.estop:active{background:var(--crit);color:#1a0705}
+.status{display:flex;align-items:center;gap:10px;margin-top:12px}
+.pill{display:inline-flex;align-items:center;gap:7px;font-family:var(--f-mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--mute);border:1px solid var(--line);border-radius:99px;padding:5px 10px;background:var(--panel)}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--ok);box-shadow:0 0 8px var(--ok)}
+.dot.sim{background:var(--brass);box-shadow:0 0 8px var(--brass)}
+.clock{margin-left:auto;font-family:var(--f-mono);font-size:12px;color:var(--mute)}
+.seg{display:flex;border:1px solid var(--line);border-radius:10px;padding:3px;background:var(--panel);margin-top:12px}
+.seg button{flex:1;padding:9px 0;border-radius:7px;font-family:var(--f-head);font-weight:600;font-size:15px;letter-spacing:.1em;text-transform:uppercase;color:var(--mute);transition:.2s}
+.seg button[aria-pressed="true"]{background:var(--panel2);color:var(--ink);box-shadow:inset 0 0 0 1px var(--line2)}
+.auto-note{display:none;margin-top:10px;font-size:12.5px;color:var(--brass);font-family:var(--f-mono)}
+body.is-auto .auto-note{display:block}
+
+/* ───────── Panneaux ───────── */
+.panel{position:relative;background:linear-gradient(180deg,var(--panel),var(--bg2));border:1px solid var(--line);border-radius:var(--r);padding:16px;margin-bottom:14px}
+.panel::before,.panel::after{content:"";position:absolute;width:11px;height:11px;border:2px solid var(--ice);opacity:.7}
+.panel::before{top:-1px;left:-1px;border-right:0;border-bottom:0;border-radius:var(--r) 0 0 0}
+.panel::after{bottom:-1px;right:-1px;border-left:0;border-top:0;border-radius:0 0 var(--r) 0}
+.plate{display:flex;align-items:center;justify-content:space-between;gap:8px;font-family:var(--f-mono);font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--mute);margin-bottom:12px}
+.plate b{font-weight:500;color:var(--dim)}
+.big{font-family:var(--f-head);font-weight:600;line-height:.9;letter-spacing:.01em}
+.unit{font-family:var(--f-head);font-weight:500;color:var(--mute)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.grid2 .panel{margin:0}
+.view{display:none}
+.view.on{display:block}
+.view h2{font-family:var(--f-head);font-size:13px;letter-spacing:.2em;text-transform:uppercase;color:var(--mute);font-weight:600;margin:20px 2px 10px}
+.view h2:first-child{margin-top:4px}
+
+/* Jauge */
+.gauge{position:relative;text-align:center}
+.gauge svg{width:100%;max-width:340px;display:block;margin:0 auto}
+.gauge .read{position:absolute;left:0;right:0;bottom:6px}
+.gauge .read .big{font-size:64px}
+.gauge .read .unit{font-size:26px;vertical-align:top;margin-left:2px}
+.gauge .sub{font-family:var(--f-mono);font-size:11px;color:var(--mute);margin-top:6px;letter-spacing:.06em}
+.chip{display:inline-block;font-family:var(--f-mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;padding:3px 8px;border-radius:5px;border:1px solid currentColor}
+.chip.ok{color:var(--ok)} .chip.warn{color:var(--warn)} .chip.crit{color:var(--crit)} .chip.off{color:var(--dim)} .chip.ice{color:var(--ice)}
+.kpi .big{font-size:42px}
+.kpi .foot{margin-top:10px;font-size:12px;color:var(--mute)}
+.kpi .foot b{color:var(--ink);font-weight:500;font-family:var(--f-mono)}
+
+/* Synoptique */
+.syn{width:100%;display:block}
+.syn text{font-family:var(--f-mono);font-size:8.5px;fill:var(--mute);letter-spacing:.08em}
+.syn .t{font-size:10px;fill:var(--ink);font-weight:500}
+.syn .lab{font-family:var(--f-head);font-size:11px;letter-spacing:.14em;fill:var(--ice);font-weight:600}
+.syn .box{fill:#0a1330;stroke:var(--line2);stroke-width:1.5}
+.syn .pipe{fill:none;stroke:#1a2a5c;stroke-width:7;stroke-linecap:round;stroke-linejoin:round}
+.syn .fl{fill:none;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:1 9;opacity:0;transition:opacity .3s}
+.syn .fl.hot{stroke:var(--copper)} .syn .fl.cold{stroke:var(--ice)} .syn .fl.oil{stroke:var(--brass)} .syn .fl.purge{stroke:var(--crit)}
+.syn .fl.on{opacity:1;animation:flow 1s linear infinite}
+@keyframes flow{to{stroke-dashoffset:-10}}
+.syn .coil{fill:none;stroke:var(--copper);stroke-width:2;opacity:.85}
+.syn .plates{stroke:var(--line2);stroke-width:1.2}
+.syn .vv path{fill:var(--dim);stroke:none;transition:fill .3s}
+.syn .vv.open path{fill:var(--ok)} .syn .vv.closed path{fill:var(--crit)} .syn .vv.opening path,.syn .vv.closing path{fill:var(--warn);animation:blink .7s steps(2) infinite}
+@keyframes blink{50%{opacity:.25}}
+.syn .pp circle.b{fill:#0a1330;stroke:var(--dim);stroke-width:1.6;transition:.3s}
+.syn .pp.on circle.b{stroke:var(--ok)}
+.syn .pp .blade{fill:var(--dim);transform-box:fill-box;transform-origin:center}
+.syn .pp.on .blade{fill:var(--ok);animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-family:var(--f-mono);font-size:10px;color:var(--mute);margin-top:6px;letter-spacing:.06em}
+.legend i{display:inline-block;width:14px;height:3px;border-radius:2px;margin-right:6px;vertical-align:middle}
+
+.spark{width:100%;height:76px;display:block}
+.spark .grid{stroke:var(--line);stroke-width:1;stroke-dasharray:2 4}
+.spark .band{fill:rgba(95,227,161,.08)}
+.spark polyline{fill:none;stroke:var(--ice);stroke-width:2;stroke-linejoin:round}
+
+/* Commandes */
+.cmd{display:flex;align-items:center;gap:12px;padding:13px 0;border-top:1px solid var(--line)}
+.cmd:first-of-type{border-top:0;padding-top:2px}
+.cmd .ic{flex:none;width:44px;height:44px;border-radius:10px;border:1px solid var(--line2);display:grid;place-items:center;background:var(--bg);color:var(--dim);transition:.3s}
+.cmd .ic svg{width:24px;height:24px}
+.cmd.s-open .ic,.cmd.s-on .ic{color:var(--ok);border-color:rgba(95,227,161,.5)}
+.cmd.s-closed .ic{color:var(--dim)}
+.cmd.s-opening .ic,.cmd.s-closing .ic{color:var(--warn);border-color:rgba(255,207,92,.5)}
+.cmd .tx{flex:1;min-width:0}
+.cmd .tx b{display:block;font-weight:600;font-size:15px}
+.cmd .tx span{display:block;font-family:var(--f-mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--mute);margin-top:2px}
+.cmd.s-open .tx span,.cmd.s-on .tx span{color:var(--ok)}
+.cmd.s-opening .tx span,.cmd.s-closing .tx span{color:var(--warn)}
+.sw{flex:none;position:relative;width:64px;height:36px;border-radius:8px;background:var(--bg);border:1px solid var(--line2);transition:.25s}
+.sw::after{content:"";position:absolute;top:3px;left:3px;width:28px;height:28px;border-radius:5px;background:linear-gradient(180deg,#3a4f93,#26376d);box-shadow:inset 0 1px 0 rgba(255,255,255,.18),0 2px 6px rgba(0,0,0,.5);transition:transform .25s cubic-bezier(.3,.9,.3,1),background .25s}
+.sw[aria-checked="true"]{border-color:rgba(95,227,161,.6);background:rgba(95,227,161,.1)}
+.sw[aria-checked="true"]::after{transform:translateX(28px);background:linear-gradient(180deg,#7bf0b9,#3fbf85)}
+.sw.mid::after{transform:translateX(14px);background:linear-gradient(180deg,#ffd97d,#d9a52e)}
+.sw:disabled{opacity:.6}
+body.is-auto .sw,body.is-auto .btn-act{opacity:.45;pointer-events:none}
+.btn-act{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:14px;border-radius:12px;border:1px solid var(--line2);background:var(--panel2);font-family:var(--f-head);font-size:17px;font-weight:600;letter-spacing:.1em;text-transform:uppercase}
+.btn-act:active{transform:translateY(1px);background:#1a2d63}
+.btn-act.danger{border-color:var(--crit);color:var(--crit);background:rgba(255,107,94,.08)}
+.btn-act.ghost{background:transparent;color:var(--mute);margin-top:10px;font-size:14px}
+
+/* Résidus */
+.res{padding:13px 0;border-top:1px solid var(--line)}
+.res:first-of-type{border-top:0;padding-top:2px}
+.res .h{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.res .h b{font-weight:600}
+.bar{position:relative;height:10px;border-radius:5px;background:var(--bg);border:1px solid var(--line);margin:10px 0 8px;overflow:hidden}
+.bar i{position:absolute;inset:0 auto 0 0;width:0;border-radius:5px;background:var(--ok);transition:width .6s,background .4s}
+.bar::after{content:"";position:absolute;top:0;bottom:0;left:40%;width:1px;background:var(--line2);box-shadow:30% 0 0 var(--line2)}
+.bar.warn i{background:var(--warn)} .bar.crit i{background:var(--crit)}
+.res .m{display:flex;gap:16px;font-family:var(--f-mono);font-size:11px;color:var(--mute)}
+.res .m b{color:var(--ink);font-weight:500}
+
+/* Journal */
+.log{list-style:none;margin:0;padding:0}
+.log li{display:grid;grid-template-columns:auto 1fr;gap:3px 12px;padding:11px 0;border-top:1px solid var(--line)}
+.log li:first-child{border-top:0;padding-top:2px}
+.log time{font-family:var(--f-mono);font-size:11px;color:var(--mute);grid-row:span 2;padding-top:2px}
+.log .lv{font-family:var(--f-mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase}
+.log .lv.info{color:var(--ice)} .log .lv.ok{color:var(--ok)} .log .lv.warn{color:var(--warn)} .log .lv.crit{color:var(--crit)}
+.log p{margin:0;font-size:14px}
+
+/* Navigation basse */
+.nav{position:fixed;left:0;right:0;bottom:0;z-index:30;background:rgba(7,13,31,.94);backdrop-filter:blur(10px);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom)}
+.nav .in{display:grid;grid-template-columns:repeat(4,1fr);max-width:560px;margin:0 auto;height:var(--nav)}
+.nav button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;color:var(--dim);font-family:var(--f-head);font-weight:600;font-size:12.5px;letter-spacing:.14em;text-transform:uppercase;position:relative}
+.nav button svg{width:24px;height:24px}
+.nav button[aria-current="true"]{color:var(--ice)}
+.nav button[aria-current="true"]::before{content:"";position:absolute;top:-1px;left:28%;right:28%;height:3px;border-radius:0 0 3px 3px;background:var(--ice);box-shadow:0 0 14px var(--ice)}
+.nav .badge{position:absolute;top:9px;left:calc(50% + 8px);min-width:16px;height:16px;border-radius:8px;background:var(--crit);color:#1a0705;font-size:10px;font-weight:700;display:none;place-items:center;padding:0 4px;font-family:var(--f-mono)}
+.nav .badge.on{display:grid}
+
+/* Toast + confirmation */
+.toast{position:fixed;left:16px;right:16px;bottom:calc(var(--nav) + 18px + env(safe-area-inset-bottom));max-width:528px;margin:0 auto;z-index:40;background:var(--panel2);border:1px solid var(--line2);border-left:4px solid var(--warn);border-radius:10px;padding:12px 14px;font-size:14px;transform:translateY(20px);opacity:0;pointer-events:none;transition:.25s}
+.toast.on{transform:none;opacity:1}
+.sheet{position:fixed;inset:0;z-index:50;background:rgba(3,6,16,.72);display:none;align-items:flex-end;justify-content:center}
+.sheet.on{display:flex}
+.sheet .card{width:100%;max-width:560px;background:var(--panel);border:1px solid var(--crit);border-radius:18px 18px 0 0;padding:22px 18px calc(22px + env(safe-area-inset-bottom))}
+.sheet h3{margin:0 0 6px;font-family:var(--f-head);font-size:24px;letter-spacing:.06em;text-transform:uppercase;color:var(--crit)}
+.sheet p{margin:0 0 18px;color:var(--mute)}
+.sheet .two{display:grid;grid-template-columns:1fr 1.4fr;gap:10px}
+
+/* Tablette / bureau */
+@media (min-width:900px){
+  .wrap{max-width:1080px}
+  .nav{display:none}
+  body{padding-bottom:40px}
+  .views{display:grid;grid-template-columns:1.15fr .85fr;gap:0 22px;align-items:start}
+  .view{display:block}
+  #v-sync{grid-row:span 3}
+  .toast{bottom:24px}
+  .top .row,.status,.seg{max-width:1080px}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <div class="row">
+      <div class="brand">
+        <svg class="mark" viewBox="0 0 40 40" aria-hidden="true">
+          <circle cx="20" cy="20" r="18" fill="#0d1832" stroke="#2d4285" stroke-width="1.5"/>
+          <path d="M20 4 A16 16 0 0 0 20 36 Z" fill="#6fd3ff" opacity=".9"/>
+          <path d="M20 4 A16 16 0 0 1 20 36 Z" fill="#ff8a4c" opacity=".9"/>
+          <path d="M8 24 Q14 14 20 20 T32 16" fill="none" stroke="#070d1f" stroke-width="2.4" stroke-linecap="round"/>
+        </svg>
+        <div>
+          <h1>ThermoLoop</h1>
+          <small>Groupe froid · récupération de chaleur</small>
+        </div>
+      </div>
+      <button class="estop" id="estop" aria-label="Arrêt d'urgence">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 3v9"/><path d="M6.3 6.8a8 8 0 1 0 11.4 0"/></svg>
+      </button>
+    </div>
+    <div class="status">
+      <span class="pill"><span class="dot sim" id="linkDot"></span><span id="linkTxt">Simulation</span></span>
+      <span class="clock" id="clock">--:--:--</span>
+    </div>
+    <div class="seg" role="group" aria-label="Mode de pilotage">
+      <button id="mManual" aria-pressed="true">Manuel</button>
+      <button id="mAuto" aria-pressed="false">Automatique</button>
+    </div>
+    <div class="auto-note">▸ Régulation automatique active — commandes verrouillées</div>
+  </div>
+</header>
+
+<main class="wrap">
+<div class="views">
+
+  <!-- ═════ SYNOPTIQUE ═════ -->
+  <section class="view on" id="v-sync">
+    <div class="panel">
+      <div class="plate"><span>Eau chauffée · boucle condenseur</span><span class="chip off" id="waterChip">—</span></div>
+      <div class="gauge">
+        <svg viewBox="0 0 200 124" aria-hidden="true">
+          <defs>
+            <linearGradient id="gg" x1="0" x2="1"><stop offset="0" stop-color="#6fd3ff"/><stop offset=".55" stop-color="#f2b45a"/><stop offset="1" stop-color="#ff6b5e"/></linearGradient>
+          </defs>
+          <path d="M20 110 A80 80 0 0 1 180 110" pathLength="100" fill="none" stroke="#16264f" stroke-width="14" stroke-linecap="round"/>
+          <path d="M20 110 A80 80 0 0 1 180 110" pathLength="100" fill="none" stroke="rgba(95,227,161,.28)" stroke-width="14" stroke-dasharray="12 88" stroke-dashoffset="-50"/>
+          <path id="gArc" d="M20 110 A80 80 0 0 1 180 110" pathLength="100" fill="none" stroke="url(#gg)" stroke-width="14" stroke-linecap="round" stroke-dasharray="0 100" style="transition:stroke-dasharray .8s"/>
+          <g font-family="JetBrains Mono" font-size="7" fill="#5a6a98" text-anchor="middle">
+            <text x="20" y="123">0</text><text x="100" y="22">50</text><text x="180" y="123">100°C</text>
+          </g>
+        </svg>
+        <div class="read"><span class="big" id="waterT">--</span><span class="unit">°C</span>
+          <div class="sub">PLAGE CIBLE 50 – 62 °C · ALARME &gt; 75 °C</div></div>
+      </div>
+    </div>
+
+    <div class="grid2" style="margin-bottom:14px">
+      <div class="panel kpi">
+        <div class="plate"><span>Salle machines</span></div>
+        <span class="big" id="roomT">--</span><span class="unit" style="font-size:20px"> °C</span>
+        <div class="foot">Consigne <b>≤ 25 °C</b><br><span class="chip off" id="roomChip" style="margin-top:8px">—</span></div>
+      </div>
+      <div class="panel kpi">
+        <div class="plate"><span>Pétrole sortie</span></div>
+        <span class="big" id="oilT">--</span><span class="unit" style="font-size:20px"> °C</span>
+        <div class="foot">Viscosité <b id="visc">--</b> cSt<br><span style="font-size:10.5px;color:var(--dim)">valeur estimée</span></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="plate"><span>Synoptique</span><b>Temps réel</b></div>
+      <svg class="syn" viewBox="0 0 360 300" role="img" aria-label="Schéma du circuit : condenseur, boucle d'eau, échangeur, circuit pétrole">
+        <!-- tuyaux de base -->
+        <path class="pipe" d="M128 50 H170 V196"/>
+        <path class="pipe" d="M190 196 V84 H128"/>
+        <path class="pipe" d="M8 231 H130"/>
+        <path class="pipe" d="M230 231 H352"/>
+        <path class="pipe" d="M290 231 V282"/>
+        <!-- flux -->
+        <path class="fl hot"  id="flHot"  d="M128 50 H170 V196"/>
+        <path class="fl cold" id="flCold" d="M190 196 V84 H128"/>
+        <path class="fl oil"  id="flOil1" d="M8 231 H130"/>
+        <path class="fl oil"  id="flOil2" d="M230 231 H352"/>
+        <path class="fl purge" id="flPurge" d="M290 231 V282"/>
+        <!-- condenseur -->
+        <rect class="box" x="16" y="22" width="112" height="90" rx="6"/>
+        <path class="coil" d="M30 50 H100 Q112 50 112 60 Q112 70 100 70 H44 Q32 70 32 80 Q32 90 44 90 H112"/>
+        <circle id="spComp" cx="26" cy="35" r="3.5" fill="#5a6a98"/>
+        <text x="34" y="38" style="font-size:7.5px">COMPRESSEUR</text>
+        <text class="lab" x="72" y="105" text-anchor="middle">CONDENSEUR</text>
+        <!-- échangeur 2 -->
+        <rect class="box" x="130" y="196" width="100" height="72" rx="6"/>
+        <g class="plates"><path d="M148 204v56M162 204v56M176 204v56M190 204v56M204 204v56M218 204v56"/></g>
+        <text class="lab" x="180" y="282" text-anchor="middle">ÉCHANGEUR 2</text>
+        <!-- vannes -->
+        <g class="vv" id="svV1" transform="translate(150 50)"><path d="M-9 -7 L0 0 L-9 7 Z M9 -7 L0 0 L9 7 Z"/><text y="-12" text-anchor="middle">V1</text></g>
+        <g class="vv" id="svV2" transform="translate(48 231)"><path d="M-9 -7 L0 0 L-9 7 Z M9 -7 L0 0 L9 7 Z"/><text y="-12" text-anchor="middle">V2</text></g>
+        <g class="vv" id="svV3" transform="translate(290 256) rotate(90)"><path d="M-9 -7 L0 0 L-9 7 Z M9 -7 L0 0 L9 7 Z"/></g>
+        <text x="300" y="259">V3 PURGE</text>
+        <!-- pompes -->
+        <g class="pp" id="spP1" transform="translate(190 150)"><circle class="b" r="11"/><path class="blade" d="M0 -6 L5.5 4 L-5.5 4 Z"/></g>
+        <text x="206" y="153">P1</text>
+        <g class="pp" id="spP2" transform="translate(96 231)"><circle class="b" r="11"/><path class="blade" d="M0 -6 L5.5 4 L-5.5 4 Z"/></g>
+        <text x="96" y="256" text-anchor="middle">P2</text>
+        <!-- températures -->
+        <text x="164" y="130" text-anchor="end" class="t" id="sWh">--</text>
+        <text x="196" y="118" class="t" id="sWr">--</text>
+        <text x="8" y="252" class="t" id="sOi">--</text>
+        <text x="352" y="252" text-anchor="end" class="t" id="sOo">--</text>
+        <text x="8" y="220">PÉTROLE ENTRÉE</text>
+        <text x="352" y="220" text-anchor="end">SORTIE</text>
+        <!-- légende interne -->
+        <text class="lab" x="250" y="40">CIRCUIT D'EAU</text>
+        <text x="250" y="56">Condenseur → échangeur 2</text>
+        <text x="250" y="70">La chaleur rejetée par le</text>
+        <text x="250" y="82">groupe froid chauffe l'eau,</text>
+        <text x="250" y="94">qui fluidifie le pétrole.</text>
+      </svg>
+      <div class="legend">
+        <span><i style="background:var(--copper)"></i>Eau chaude</span>
+        <span><i style="background:var(--ice)"></i>Eau retour</span>
+        <span><i style="background:var(--brass)"></i>Pétrole</span>
+        <span><i style="background:var(--crit)"></i>Purge</span>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="plate"><span>Température eau · 90 dernières s</span></div>
+      <svg class="spark" viewBox="0 0 300 76" preserveAspectRatio="none" aria-hidden="true">
+        <rect class="band" x="0" y="0" width="300" height="0" id="spBand"/>
+        <line class="grid" x1="0" x2="300" y1="19" y2="19"/><line class="grid" x1="0" x2="300" y1="38" y2="38"/><line class="grid" x1="0" x2="300" y1="57" y2="57"/>
+        <polyline id="spLine" points=""/>
+      </svg>
+    </div>
+
+    <button class="panel btn-act" style="margin-bottom:14px" id="goRes">
+      <span>Résidus :</span><span class="chip off" id="resSum">—</span>
+    </button>
+  </section>
+
+  <!-- ═════ COMMANDES ═════ -->
+  <section class="view" id="v-cmd">
+    <h2>Vannes</h2>
+    <div class="panel" id="listValves"></div>
+    <h2>Moteurs</h2>
+    <div class="panel" id="listMotors"></div>
+    <button class="btn-act danger" id="estop2">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 3v9"/><path d="M6.3 6.8a8 8 0 1 0 11.4 0"/></svg>
+      Arrêt d'urgence
+    </button>
+  </section>
+
+  <!-- ═════ RÉSIDUS ═════ -->
+  <section class="view" id="v-res">
+    <h2>Encrassement des conduites</h2>
+    <div class="panel" id="listRes"></div>
+    <button class="btn-act" id="btnPurge">Lancer une purge</button>
+    <button class="btn-act ghost" id="btnDemo">Simuler un dépôt (test)</button>
+  </section>
+
+  <!-- ═════ JOURNAL ═════ -->
+  <section class="view" id="v-log">
+    <h2>Journal d'événements</h2>
+    <div class="panel"><ul class="log" id="logList"></ul></div>
+  </section>
+
+</div>
+</main>
+
+<nav class="nav" aria-label="Navigation principale"><div class="in">
+  <button data-v="sync" aria-current="true">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="7" height="6" rx="1"/><rect x="14" y="14" width="7" height="6" rx="1"/><path d="M10 7h4a3 3 0 0 1 3 3v4"/></svg>Synoptique</button>
+  <button data-v="cmd">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h10M18 8h2M4 16h2M10 16h10"/><circle cx="16" cy="8" r="2"/><circle cx="8" cy="16" r="2"/></svg>Commandes</button>
+  <button data-v="res">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9h18M3 15h18"/><path d="M8 9v6M13 9v6M17 9v6" stroke-dasharray="1 2.5"/></svg>Résidus<span class="badge" id="resBadge">0</span></button>
+  <button data-v="log">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 5h14M5 10h14M5 15h9M5 20h6"/></svg>Journal</button>
+</div></nav>
+
+<div class="toast" id="toast" role="status"></div>
+
+<div class="sheet" id="sheet">
+  <div class="card">
+    <h3>Arrêt d'urgence</h3>
+    <p>Les moteurs seront coupés immédiatement et les vannes V1 et V2 fermées. Le mode manuel sera activé.</p>
+    <div class="two">
+      <button class="btn-act" id="shNo">Annuler</button>
+      <button class="btn-act danger" id="shYes">Confirmer l'arrêt</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════
+   CONFIGURATION
+   Pour brancher le vrai automate / ESP32 / Raspberry Pi :
+   1) renseigner API_BASE (ex. 'http://192.168.1.50/api')
+   2) mettre SIM à false
+   3) adapter readSensors() pour lire vos capteurs (voir plus bas)
+   ═══════════════════════════════════════════════════════════ */
+const CONFIG = { API_BASE: null, SIM: true };
+
+const $ = s => document.querySelector(s);
+const clamp = (v,a,b) => Math.max(a, Math.min(b, v));
+const rand = (a,b) => a + Math.random()*(b-a);
+const fx = (v,d=1) => v.toFixed(d).replace('.',',');
+
+/* ── État ── */
+const S = {
+  mode:'manual',
+  roomT:27.5, waterT:34, oilIn:28, oilOut:28,
+  valves:{v1:'open', v2:'open', v3:'closed'},
+  motors:{comp:false, p1:false, p2:false},
+  foul:{c1:12, e2:18, c2:9, f1:24},
+  hist:[], autoComp:false, alert:{}
+};
+
+const VALVES = {
+  v1:{name:'V1 · Vanne boucle d’eau', sub:'Circuit condenseur → échangeur'},
+  v2:{name:'V2 · Vanne pétrole', sub:'Entrée échangeur 2'},
+  v3:{name:'V3 · Vanne de purge', sub:'Évacuation des résidus'}
+};
+const MOTORS = {
+  comp:{name:'Compresseur', sub:'Groupe froid · source de chaleur'},
+  p1:{name:'Pompe P1 · eau', sub:'Boucle d’eau chauffée'},
+  p2:{name:'Pompe P2 · pétrole', sub:'Circuit pétrole'}
+};
+const SECT = {
+  c1:'Conduite eau chaude',
+  e2:'Échangeur 2 · plaques',
+  c2:'Conduite pétrole amont',
+  f1:'Conduite pétrole aval'
+};
+
+const ICON = {
+  valve:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 6l9 6-9 6zM21 6l-9 6 9 6z"/><rect x="11" y="2" width="2" height="6"/></svg>',
+  motor:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="8"/><path d="M12 12V6M12 12l5 3M12 12l-5 3" /></svg>'
+};
+
+/* ── Journal ── */
+function log(level, msg){
+  const t = new Date().toLocaleTimeString('fr-FR');
+  S.logs = S.logs || [];
+  S.logs.unshift({t, level, msg});
+  S.logs.length = Math.min(S.logs.length, 40);
+  renderLog();
+}
+function renderLog(){
+  const lbl = {info:'Info', ok:'OK', warn:'Alerte', crit:'Critique'};
+  $('#logList').innerHTML = (S.logs||[]).map(l =>
+    `<li><time>${l.t}</time><span class="lv ${l.level}">${lbl[l.level]}</span><p>${l.msg}</p></li>`).join('');
+}
+
+/* ── Toast ── */
+let toastT;
+function toast(msg){
+  const el = $('#toast'); el.textContent = msg; el.classList.add('on');
+  clearTimeout(toastT); toastT = setTimeout(()=>el.classList.remove('on'), 3200);
+}
+
+/* ── Envoi des commandes vers le matériel ── */
+function sendCommand(type, id, value){
+  if(!CONFIG.API_BASE) return;
+  fetch(`${CONFIG.API_BASE}/${type}/${id}`, {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({value})
+  }).catch(()=>log('crit','Liaison perdue avec le contrôleur'));
+}
+
+/* ── Vannes ── */
+const vOpen = id => S.valves[id] === 'open';
+function setValve(id, target){
+  const cur = S.valves[id];
+  if(cur === target) return;
+  S.valves[id] = target === 'open' ? 'opening' : 'closing';
+  sendCommand('valve', id, target);
+  render();
+  setTimeout(()=>{
+    S.valves[id] = target; render();
+    log('info', `${VALVES[id].name} ${target==='open'?'ouverte':'fermée'}`);
+  }, 2200);
+}
+function cmdValve(id){
+  const st = S.valves[id];
+  if(st==='opening'||st==='closing') return toast('Vanne en mouvement, patientez.');
+  if(st==='open'){
+    if(id==='v1' && S.motors.p1) return toast('Arrêtez d’abord la pompe P1 avant de fermer V1.');
+    if(id==='v2' && S.motors.p2) return toast('Arrêtez d’abord la pompe P2 avant de fermer V2.');
+    setValve(id,'closed');
+  } else {
+    if(id==='v3' && !(S.motors.p2 && vOpen('v2'))) return toast('La purge nécessite P2 en marche et V2 ouverte.');
+    setValve(id,'open');
+  }
+}
+
+/* ── Moteurs ── */
+function setMotor(id, on, quiet){
+  if(S.motors[id] === on) return;
+  S.motors[id] = on;
+  sendCommand('motor', id, on);
+  if(!quiet) log(on?'ok':'info', `${MOTORS[id].name} ${on?'démarré':'arrêté'}`);
+  render();
+}
+function cmdMotor(id){
+  const on = !S.motors[id];
+  if(on){
+    if(id==='p1' && !vOpen('v1')) return toast('Ouvrez V1 avant de démarrer P1.');
+    if(id==='p2' && !vOpen('v2')) return toast('Ouvrez V2 avant de démarrer P2.');
+    if(id==='comp' && !S.motors.p1) return toast('Démarrez P1 avant le compresseur : la chaleur doit être évacuée.');
+  } else {
+    if(id==='p1' && S.motors.comp) return toast('Arrêtez d’abord le compresseur.');
+    if(id==='p2' && S.valves.v3!=='closed') return toast('Fermez la purge V3 avant d’arrêter P2.');
+  }
+  setMotor(id, on);
+}
+
+/* ── Arrêt d'urgence ── */
+function emergency(){
+  setMode('manual');
+  ['comp','p1','p2'].forEach(m => { S.motors[m]=false; sendCommand('motor',m,false); });
+  ['v1','v2'].forEach(v => { if(S.valves[v]!=='closed') setValve(v,'closed'); });
+  if(S.valves.v3!=='closed') setValve('v3','closed');
+  log('crit','ARRÊT D’URGENCE — moteurs coupés, vannes en fermeture');
+  render();
+}
+
+/* ── Mode ── */
+function setMode(m){
+  S.mode = m;
+  document.body.classList.toggle('is-auto', m==='auto');
+  $('#mManual').setAttribute('aria-pressed', m==='manual');
+  $('#mAuto').setAttribute('aria-pressed', m==='auto');
+  log('info', m==='auto' ? 'Mode automatique activé' : 'Mode manuel activé');
+}
+
+/* ── Régulation automatique (simulation) ── */
+function autoLogic(){
+  if(S.valves.v1==='closed') setValve('v1','open');
+  if(S.valves.v2==='closed') setValve('v2','open');
+  if(S.roomT > 25.5) S.autoComp = true;
+  if(S.roomT < 23.8) S.autoComp = false;
+  const p1 = vOpen('v1') && S.autoComp;
+  setMotor('p1', p1);
+  setMotor('comp', p1 && S.autoComp);
+  const p2 = vOpen('v2') && (S.motors.p2 ? S.waterT > 42 : S.waterT >= 45);
+  const maxF = Math.max(...Object.values(S.foul));
+  const purge = p2 && maxF > 80 || (S.valves.v3!=='closed' && maxF > 45 && p2);
+  if(purge && S.valves.v3==='closed') setValve('v3','open');
+  if(!purge && vOpen('v3')) setValve('v3','closed');
+  if(S.valves.v3==='closed') setMotor('p2', p2);
+}
+
+/* ── Capteurs ──
+   En simulation, les valeurs sont calculées ci-dessous.
+   En réel : remplacer par un fetch(`${API_BASE}/sensors`) puis copier
+   les valeurs reçues dans S.waterT, S.roomT, S.oilOut, S.foul.c1 ... */
+function readSensors(){
+  const f1 = S.motors.p1 && vOpen('v1');
+  const f2 = S.motors.p2 && vOpen('v2');
+  let dW = 0;
+  if(S.motors.comp && f1) dW += 0.03*(80 - S.waterT)*(1 - S.foul.c1/250);
+  if(f2) dW -= 0.025*(S.waterT - S.oilIn)*(1 - S.foul.e2/130);
+  dW -= 0.002*(S.waterT - S.roomT);
+  S.waterT += dW*0.35 + rand(-.04,.04);
+
+  S.oilIn = 28 + Math.sin(Date.now()/60000)*1.2;
+  const tgt = f2 ? S.oilIn + (S.waterT - S.oilIn)*0.6*(1 - S.foul.e2/120) : S.oilIn;
+  S.oilOut += (tgt - S.oilOut)*0.15 + rand(-.03,.03);
+
+  const rT = S.motors.comp ? 23.5 : 33;
+  S.roomT += (rT - S.roomT)*0.004 + rand(-.02,.02);
+
+  if(f2){ S.foul.e2 += rand(.01,.03); S.foul.c2 += rand(.015,.04); S.foul.f1 += rand(.01,.035); }
+  if(f1){ S.foul.c1 += rand(.002,.008); }
+  if(vOpen('v3') && f2){
+    for(const k in S.foul) S.foul[k] = Math.max(2, S.foul[k] - rand(.8,1.8));
+  }
+  for(const k in S.foul) S.foul[k] = clamp(S.foul[k], 0, 100);
+}
+
+function checkAlerts(){
+  for(const k in S.foul){
+    const lvl = S.foul[k] >= 70 ? 2 : S.foul[k] >= 40 ? 1 : 0;
+    if((S.alert[k]||0) !== lvl){
+      if(lvl===2) log('crit', `${SECT[k]} : colmatage détecté (${Math.round(S.foul[k])} %)`);
+      else if(lvl===1 && (S.alert[k]||0)===0) log('warn', `${SECT[k]} : encrassement à surveiller`);
+      else if(lvl===0) log('ok', `${SECT[k]} : retour à un état propre`);
+      S.alert[k] = lvl;
+    }
+  }
+  const wl = S.waterT > 75 ? 2 : 0;
+  if((S.alert.water||0)!==wl){
+    if(wl) log('crit','Température d’eau supérieure à 75 °C');
+    S.alert.water = wl;
+  }
+}
+
+/* ── Rendu ── */
+function buildLists(){
+  $('#listValves').innerHTML = Object.keys(VALVES).map(id => `
+    <div class="cmd" data-valve="${id}">
+      <div class="ic">${ICON.valve}</div>
+      <div class="tx"><b>${VALVES[id].name}</b><span></span></div>
+      <button class="sw" role="switch" aria-label="${VALVES[id].name}"></button>
+    </div>`).join('');
+  $('#listMotors').innerHTML = Object.keys(MOTORS).map(id => `
+    <div class="cmd" data-motor="${id}">
+      <div class="ic">${ICON.motor}</div>
+      <div class="tx"><b>${MOTORS[id].name}</b><span></span></div>
+      <button class="sw" role="switch" aria-label="${MOTORS[id].name}"></button>
+    </div>`).join('');
+  $('#listRes').innerHTML = Object.keys(SECT).map(id => `
+    <div class="res" data-res="${id}">
+      <div class="h"><b>${SECT[id]}</b><span class="chip"></span></div>
+      <div class="bar"><i></i></div>
+      <div class="m"><span>Encrassement <b class="p">--</b></span><span>ΔP <b class="dp">--</b> bar</span></div>
+    </div>`).join('');
+  document.querySelectorAll('[data-valve] .sw').forEach(b => b.onclick = () => cmdValve(b.closest('.cmd').dataset.valve));
+  document.querySelectorAll('[data-motor] .sw').forEach(b => b.onclick = () => cmdMotor(b.closest('.cmd').dataset.motor));
+}
+
+function stateLabel(s){
+  return {open:'Ouverte', closed:'Fermée', opening:'Ouverture…', closing:'Fermeture…'}[s];
+}
+function setChip(el, cls, txt){ el.className = 'chip ' + cls; el.textContent = txt; }
+
+function render(){
+  const w = S.waterT;
+  $('#waterT').textContent = fx(w);
+  $('#gArc').style.strokeDasharray = `${clamp(w,0,100)} 100`;
+  const wc = $('#waterChip');
+  if(w > 75) setChip(wc,'crit','Surchauffe');
+  else if(w >= 50) setChip(wc,'ok','Dans la cible');
+  else if(w > S.roomT + 6) setChip(wc,'warn','Montée en T°');
+  else setChip(wc,'off','Froid');
+
+  $('#roomT').textContent = fx(S.roomT);
+  setChip($('#roomChip'), S.roomT <= 25 ? 'ok' : S.roomT <= 28 ? 'warn' : 'crit',
+          S.roomT <= 25 ? 'Conforme' : S.roomT <= 28 ? 'Tiède' : 'Trop chaude');
+  $('#oilT').textContent = fx(S.oilOut);
+  $('#visc').textContent = Math.round(380*Math.exp(-0.042*(S.oilOut-20)));
+
+  /* synoptique */
+  const f1 = S.motors.p1 && vOpen('v1'), f2 = S.motors.p2 && vOpen('v2');
+  $('#flHot').classList.toggle('on', f1);
+  $('#flCold').classList.toggle('on', f1);
+  $('#flOil1').classList.toggle('on', f2);
+  $('#flOil2').classList.toggle('on', f2);
+  $('#flPurge').classList.toggle('on', vOpen('v3') && f2);
+  $('#spComp').setAttribute('fill', S.motors.comp ? '#5fe3a1' : '#5a6a98');
+  $('#spP1').classList.toggle('on', S.motors.p1);
+  $('#spP2').classList.toggle('on', S.motors.p2);
+  ['v1','v2','v3'].forEach(id => $('#sv'+id.toUpperCase()).setAttribute('class','vv '+S.valves[id]));
+  $('#sWh').textContent = fx(w) + '°C';
+  $('#sWr').textContent = fx(f2 ? w - (w-S.oilIn)*0.2 : w - 1) + '°C';
+  $('#sOi').textContent = fx(S.oilIn) + '°C';
+  $('#sOo').textContent = fx(S.oilOut) + '°C';
+
+  /* commandes */
+  document.querySelectorAll('[data-valve]').forEach(row => {
+    const id = row.dataset.valve, st = S.valves[id], sw = row.querySelector('.sw');
+    row.className = 'cmd s-' + st;
+    row.querySelector('span').textContent = stateLabel(st);
+    sw.setAttribute('aria-checked', st==='open');
+    sw.classList.toggle('mid', st==='opening' || st==='closing');
+  });
+  document.querySelectorAll('[data-motor]').forEach(row => {
+    const id = row.dataset.motor, on = S.motors[id], sw = row.querySelector('.sw');
+    row.className = 'cmd ' + (on ? 's-on' : 's-off');
+    row.querySelector('span').textContent = on ? 'En marche' : 'Arrêté';
+    sw.setAttribute('aria-checked', on);
+  });
+
+  /* résidus */
+  let worst = 0, alerts = 0;
+  document.querySelectorAll('[data-res]').forEach(row => {
+    const k = row.dataset.res, v = S.foul[k];
+    const lvl = v >= 70 ? 'crit' : v >= 40 ? 'warn' : 'ok';
+    worst = Math.max(worst, v); if(lvl!=='ok') alerts++;
+    row.querySelector('.bar').className = 'bar ' + lvl;
+    row.querySelector('.bar i').style.width = v + '%';
+    setChip(row.querySelector('.chip'), lvl, lvl==='ok' ? 'Propre' : lvl==='warn' ? 'À surveiller' : 'Colmaté');
+    row.querySelector('.p').textContent = Math.round(v) + ' %';
+    row.querySelector('.dp').textContent = fx(0.2 + v*0.03, 2);
+  });
+  setChip($('#resSum'), worst>=70?'crit':worst>=40?'warn':'ok', worst>=70?'Colmatage détecté':worst>=40?'À surveiller':'Aucun résidu critique');
+  const bd = $('#resBadge'); bd.textContent = alerts; bd.classList.toggle('on', alerts>0);
+}
+
+function drawSpark(){
+  const h = S.hist, lo = 20, hi = 80;
+  const y = v => 76 - (clamp(v,lo,hi)-lo)/(hi-lo)*76;
+  const n = 90;
+  const pts = h.map((v,i) => `${(i/(n-1)*300).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
+  $('#spLine').setAttribute('points', pts);
+  const band = $('#spBand'); band.setAttribute('y', y(62)); band.setAttribute('height', y(50)-y(62));
+}
+
+/* ── Boucle principale ── */
+function tick(){
+  readSensors();
+  if(S.mode==='auto') autoLogic();
+  S.hist.push(S.waterT); if(S.hist.length>90) S.hist.shift();
+  checkAlerts(); render(); drawSpark();
+  $('#clock').textContent = new Date().toLocaleTimeString('fr-FR');
+}
+
+/* ── Navigation ── */
+function show(v){
+  document.querySelectorAll('.view').forEach(s => s.classList.toggle('on', s.id==='v-'+v));
+  document.querySelectorAll('.nav button').forEach(b => b.setAttribute('aria-current', b.dataset.v===v));
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+document.querySelectorAll('.nav button').forEach(b => b.onclick = () => show(b.dataset.v));
+$('#goRes').onclick = () => show('res');
+
+/* ── Événements ── */
+$('#mManual').onclick = () => S.mode!=='manual' && setMode('manual');
+$('#mAuto').onclick = () => S.mode!=='auto' && setMode('auto');
+const openSheet = () => $('#sheet').classList.add('on');
+$('#estop').onclick = openSheet; $('#estop2').onclick = openSheet;
+$('#shNo').onclick = () => $('#sheet').classList.remove('on');
+$('#shYes').onclick = () => { $('#sheet').classList.remove('on'); emergency(); };
+$('#sheet').onclick = e => { if(e.target.id==='sheet') $('#sheet').classList.remove('on'); };
+
+$('#btnPurge').onclick = () => {
+  if(S.mode==='auto') return;
+  if(!(S.motors.p2 && vOpen('v2'))) return toast('La purge nécessite P2 en marche et V2 ouverte.');
+  if(S.valves.v3!=='closed') return toast('Purge déjà en cours.');
+  setValve('v3','open'); log('info','Purge lancée (10 s)');
+  setTimeout(()=>{ if(S.valves.v3==='open'||S.valves.v3==='opening'){ setValve('v3','closed'); }}, 10000);
+};
+$('#btnDemo').onclick = () => {
+  const keys = Object.keys(S.foul), k = keys[Math.floor(Math.random()*keys.length)];
+  S.foul[k] = clamp(S.foul[k] + 38, 0, 100);
+  toast(`Dépôt simulé : ${SECT[k]}`);
+};
+if(!CONFIG.SIM) $('#btnDemo').style.display = 'none';
+
+/* ── Démarrage ── */
+buildLists();
+log('info','Interface démarrée — mode simulation');
+log('info','Vannes V1 et V2 ouvertes, moteurs à l’arrêt');
+for(let i=0;i<90;i++) S.hist.push(S.waterT);
+tick();
+setInterval(tick, 1000);
+</script>
+</body>
+</html>
